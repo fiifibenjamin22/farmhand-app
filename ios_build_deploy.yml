@@ -1,0 +1,62 @@
+# Xcode
+# Build, test, and archive an Xcode workspace on macOS.
+# Add steps that install certificates, test, sign, and distribute an app, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/xcode
+name: $(Build.BuildId)
+variables:
+- group: ios-pipeline
+
+trigger:
+- refs/tags/*
+
+jobs:
+  - job: IOS
+    pool:
+      vmImage: 'macOS-latest'
+      variables:
+      scheme: 'Runner'
+      sdk: 'iphoneos'
+      configuration: 'Release'
+      COCOAPODS_DISABLE_STATS: true
+    steps:
+    - task: FlutterInstall@0
+      inputs:
+        channel: 'stable'
+        version: 'latest'
+    - task: FlutterBuild@0
+      inputs:
+        target: 'ios'
+        entryPoint: 'lib/main.dart'
+        projectDirectory: "."
+        iosCodesign: false
+    - task: InstallAppleCertificate@2
+      inputs:
+        certSecureFile: 'farmhandDistribution.p12'
+        certPwd: 'cfs@7330!'
+    - task: InstallAppleProvisioningProfile@1
+      inputs:
+        provisioningProfileLocation: 'secureFiles'
+        provProfileSecureFile: 'CS_FARMHAND_APPSTORE_DIST_PROVISION_PROFILE.mobileprovision'
+
+    - task: Xcode@5
+      displayName: 'Export ipa'
+      inputs:
+        actions: 'archive'     
+        scheme: 'Runner'
+        packageApp: true
+        configuration: 'Release'
+        sdk: 'iphoneos'
+        workingDirectory: './ios'
+        exportMethod: 'app-store'
+        exportTeamId: 'B7TFHDC65A'
+        provisioningProfileUuid: $(APPLE_PROV_PROFILE_UUID)
+        signingOption: 'manual'
+        signingIdentity: $(APPLE_CERTIFICATE_SIGNING_IDENTITY)
+        archivePath: ./ios/build/Runner.xcarchive
+        exportPath: ./ios/build
+        teamId: 'B7TFHDC65A'
+        xcWorkspacePath: ./ios/Runner.xcworkspace
+        args: '-verbose' 
+        exportOptions: 'plist'
+        exportOptionsPlist: './ios/Runner/exportOptions.plist'
+  
